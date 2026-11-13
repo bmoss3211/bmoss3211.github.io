@@ -47,8 +47,40 @@ function table(head,lines) {
     }
   }
 }
+let vault={};
+try { vault=JSON.parse(localStorage.getItem(key+'.vault'))||{} } catch {}
+function showVault(){
+  $('versions').replaceChildren();
+  $('reuse').replaceChildren(new Option('Choose a version',''));
+  for(const [version,notes] of Object.entries(vault)){
+    const item=node('li',null,$('versions'));
+    node('strong',version,item);node('p',notes,item);
+    $('reuse').add(new Option(version,version));
+  }
+}
+$('vault').onsubmit=e=>{
+  e.preventDefault();
+  const version=e.target.elements.version.value.trim(), notes=e.target.elements.snippet.value.trim();
+  if(!version||!notes)return;
+  const next={...vault,[version]:notes};
+  try {localStorage.setItem(key+'.vault',JSON.stringify(next));vault=next;showVault();e.target.reset();$('notice').textContent='Résumé version saved.'}
+  catch {$('notice').textContent='Could not save the résumé version in this browser.'}
+};
+$('reuse').onchange=e=>{
+  const version=e.target.value;
+  if(!version)return;
+  form.elements.resume.value=version;
+  const fit=form.elements.fit;
+  fit.value=[fit.value,vault[version]].filter(Boolean).join('\n');
+  e.target.value='';
+};
+showVault();
+stages.forEach(s=>$('stage').add(new Option(s)));
 function render(){
-  const roles=data.filter(r=>($('focus').value==='All roles'||r.track===$('focus').value)&&(!$('hide').checked||!expired(r)));
+  const term=$('search').value.trim().toLowerCase();
+  const follow=data.filter(r=>r.follow&&r.status!=='Closed').length;
+  $('counts').textContent=data.length+' total · '+data.filter(r=>r.status==='Applied').length+' applied · '+data.filter(r=>r.status==='Interviewing').length+' interviewing · '+follow+' scheduled follow-ups';
+  const roles=data.filter(r=>(r.status===$('stage').value||$('stage').value==='All stages')&&[r.company,r.position,r.location,r.requirements].join(' ').toLowerCase().includes(term)&&($('focus').value==='All roles'||r.track===$('focus').value)&&(!$('hide').checked||!expired(r)));
   const out=$('output');out.replaceChildren();
   if($('view').value==='Table'){
     table(Object.values(fields),roles.map(r=>Object.keys(fields).map(k=>{
@@ -112,6 +144,7 @@ form.onsubmit=e=>{
     localStorage.setItem(key,JSON.stringify(next));data=next;dialog.close();render();$('notice').textContent='Role saved.';
   }catch(e){$('error').textContent=e.message}
 };
+$('search').oninput=()=>{selected.clear();render()};
 $('add').onclick=()=>edit();$('cancel').onclick=()=>dialog.close();
-for(const id of ['view','focus','hide'])$(id).onchange=()=>{selected.clear();render()};
+for(const id of ['view','focus','hide','stage'])$(id).onchange=()=>{selected.clear();render()};
 render();
